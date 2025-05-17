@@ -31,7 +31,7 @@ def main(mode, args):
         assert args.image_size == 256, "512x512 models are not yet available for auto-download." # remove this line when 512x512 models are available
         learn_sigma = args.image_size == 256
     else:
-        learn_sigma = False
+        learn_sigma = True
 
     # Load model:
     latent_size = args.image_size // 8
@@ -82,7 +82,7 @@ def main(mode, args):
         )
     
 
-    vae = AutoencoderKL.from_pretrained(f"stabilityai/sd-vae-ft-{args.vae}").to(device)
+    vae = AutoencoderKL.from_pretrained("/cephfs/shared/linzhuo/multimodal/SiT/vae").to(device)
 
     # Labels to condition the model with (feel free to change):
     class_labels = [207, 360, 387, 974, 88, 979, 417, 279]

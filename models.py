@@ -90,6 +90,25 @@ class LabelEmbedder(nn.Module):
         embeddings = self.embedding_table(labels)
         return embeddings
 
+class ConditionEmbedder(nn.Module):
+    """
+    Projects anchor latent and RPE token into a combined condition vector (B, D).
+    """
+    def __init__(self, hidden_size, rpe_dim=320, anchor_token_dim=1152):
+        super().__init__()
+        self.rpe_proj = nn.Linear(rpe_dim, hidden_size)
+        self.anchor_proj = nn.Linear(anchor_token_dim, hidden_size)
+        self.mlp = nn.Sequential(
+            nn.SiLU(),
+            nn.Linear(hidden_size * 2, hidden_size)
+        )
+
+    def forward(self, anchor_token, rpe_token):
+        # anchor_token: (B, N, D); rpe_token: (B, N, D)
+        anchor_feat = self.anchor_proj(anchor_token.mean(dim=1))
+        rpe_feat = self.rpe_proj(rpe_token.mean(dim=1))
+        return self.mlp(torch.cat([anchor_feat, rpe_feat], dim=1))
+
 
 #################################################################################
 #                                 Core SiT Model                                #
@@ -165,7 +184,8 @@ class SiT(nn.Module):
 
         self.x_embedder = PatchEmbed(input_size, patch_size, in_channels, hidden_size, bias=True)
         self.t_embedder = TimestepEmbedder(hidden_size)
-        self.y_embedder = LabelEmbedder(num_classes, hidden_size, class_dropout_prob)
+        # self.y_embedder = LabelEmbedder(num_classes, hidden_size, class_dropout_prob)
+        self.cond_embedder = ConditionEmbedder(hidden_size)
         num_patches = self.x_embedder.num_patches
         # Will use fixed sin-cos embedding:
         self.pos_embed = nn.Parameter(torch.zeros(1, num_patches, hidden_size), requires_grad=False)
@@ -195,7 +215,13 @@ class SiT(nn.Module):
         nn.init.constant_(self.x_embedder.proj.bias, 0)
 
         # Initialize label embedding table:
-        nn.init.normal_(self.y_embedder.embedding_table.weight, std=0.02)
+        # nn.init.normal_(self.y_embedder.embedding_table.weight, std=0.02)
+        if hasattr(self, 'cond_embedder'):
+            for m in self.cond_embedder.modules():
+                if isinstance(m, nn.Linear):
+                    nn.init.xavier_uniform_(m.weight)
+                    if m.bias is not None:
+                        nn.init.constant_(m.bias, 0)
 
         # Initialize timestep embedding MLP:
         nn.init.normal_(self.t_embedder.mlp[0].weight, std=0.02)
@@ -227,7 +253,7 @@ class SiT(nn.Module):
         imgs = x.reshape(shape=(x.shape[0], c, h * p, h * p))
         return imgs
 
-    def forward(self, x, t, y):
+    def forward(self, x, t, anchor_token=None, rpe_token=None):
         """
         Forward pass of SiT.
         x: (N, C, H, W) tensor of spatial inputs (images or latent representations of images)
@@ -236,7 +262,11 @@ class SiT(nn.Module):
         """
         x = self.x_embedder(x) + self.pos_embed  # (N, T, D), where T = H * W / patch_size ** 2
         t = self.t_embedder(t)                   # (N, D)
-        y = self.y_embedder(y, self.training)    # (N, D)
+        # y = self.y_embedder(y, self.training)    # (N, D)
+        if anchor_token is not None and rpe_token is not None:
+            y = self.cond_embedder(anchor_token, rpe_token)
+        else:
+            y = torch.zeros_like(t)               # (N, D)
         c = t + y                                # (N, D)
         for block in self.blocks:
             x = block(x, c)                      # (N, T, D)

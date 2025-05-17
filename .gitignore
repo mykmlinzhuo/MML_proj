@@ -5,3 +5,9 @@ wandb
 samples
 results
 pretrained_models
+
+small_dataset
+vae
+checkpoints_outpaint
+
+*.zip
