@@ -33,20 +33,20 @@ v1-5-pruned.ckpt - 7.7GB, ema+non-ema weights. uses more VRAM - suitable for fin
 ### Training
 Using `train_text_to_image_lora.py`, I trained the model with the following commands:
 ```
-accelerate launch train_text_to_image_lora.py `
-  --pretrained_model_name_or_path="D:\models--runwayml--stable-diffusion-v1-5" `
-  --resolution=512 --center_crop --random_flip `
-  --train_batch_size=1 `
-  --gradient_accumulation_steps=4 `
-  --gradient_checkpointing `
-  --mixed_precision="fp16" `
-  --max_train_steps=15000 `
-  --learning_rate=1e-05 `
-  --max_grad_norm=1 `
-  --lr_scheduler="constant" --lr_warmup_steps=0 `
-  --output_dir="D:\weapon\axe_output" `
-  --num_train_epochs=600 `
-  --train_data_dir="D:\weapon\axe"
+accelerate launch train_text_to_image_lora.py 
+  --pretrained_model_name_or_path=/cephfs/shared/linzhuo/multimodal/FreeCustom/sd_v1.5 
+  --resolution=512 --center_crop --random_flip 
+  --train_batch_size=1 
+  --gradient_accumulation_steps=4 
+  --gradient_checkpointing 
+  --mixed_precision="fp16" 
+  --max_train_steps=15000 
+  --learning_rate=1e-05 
+  --max_grad_norm=1 
+  --lr_scheduler="constant" --lr_warmup_steps=0 
+  --output_dir="/cephfs/shared/linzhuo/multimodal/stable-diffusion-v1.5-lora/output/mc" 
+  --num_train_epochs=600 
+  --train_data_dir="/cephfs/shared/linzhuo/multimodal/stable-diffusion-v1.5-lora/dataset/mc"
 ```
 After 15000 steps which took about 2.5h in my environment, I got the output `pytorch_lora_weights.bin`
 
