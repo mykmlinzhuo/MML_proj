@@ -38,6 +38,11 @@ if __name__ == "__main__":
                             )
     model = StableDiffusionFreeCustomPipeline.from_pretrained(cfg.model_path, scheduler=scheduler).to(device)
     model.safety_checker = None
+#     # ----------  加入 LoRA / delta ----------
+    if getattr(cfg, "lora_path", None):  # 在 config.yaml 中添加 lora_path 字段
+        model.unet.load_attn_procs(cfg.lora_path)
+        print(f">> LoRA loaded from: {cfg.lora_path}")
+# # -----------------------------------------
     
     # prapare data (including prompt, mask, image, latent)
     ref_masks       = []

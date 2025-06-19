@@ -43,8 +43,14 @@ class MultiReferenceSelfAttention():
         return out
     
     def get_ref_mask(self, ref_mask, mask_weight, H, W):
-        ref_mask = ref_mask.float() * mask_weight
-        ref_mask = F.interpolate(ref_mask, (H, W))
+        if isinstance(mask_weight, list):
+            assert len(mask_weight) == 1, f"Expected single-element list, got {mask_weight}"
+            mask_weight = mask_weight[0]  # 修复嵌套 list
+        if isinstance(mask_weight, torch.Tensor):
+            mask_weight = mask_weight.item()
+
+        ref_mask = ref_mask.float() * float(mask_weight)
+        ref_mask = torch.nn.functional.interpolate(ref_mask, (H, W))
         ref_mask = ref_mask.flatten()
         return ref_mask
     
@@ -96,42 +102,102 @@ class MultiReferenceSelfAttention():
         out = rearrange(out, '(b h) n d -> b n (h d)', h=num_heads)
         return out
     
+    # def mrsa_forward(self, q, k, v, sim, attn, is_cross, place_in_unet, num_heads, **kwargs):
+    #     """
+    #     Mutli-reference self-attention(MRSA) forward function
+    #     """
+    #     if is_cross or self.cur_step not in self.step_idx or self.cur_att_layer // 2 not in self.layer_idx:
+    #         return self.sa_forward(q, k, v, sim, attn, is_cross, place_in_unet, num_heads, **kwargs)
+        
+    #     B = q.shape[0] // num_heads // 2
+        
+    #     qu, qc = q.chunk(2)
+    #     ku, kc = k.chunk(2)
+    #     vu, vc = v.chunk(2)
+
+    #     # The first batch is the q,k,v feature of $z_t$ (own feature), and the subsequent batches are the q,k,v features of $z_t^'$ (reference featrue)
+    #     qu_o, qu_r = qu[:num_heads], qu[num_heads:] 
+    #     qc_o, qc_r = qc[:num_heads], qc[num_heads:]
+        
+    #     ku_o, ku_r = ku[:num_heads], ku[num_heads:]
+    #     kc_o, kc_r = kc[:num_heads], kc[num_heads:]
+        
+    #     vu_o, vu_r = vu[:num_heads], vu[num_heads:]
+    #     vc_o, vc_r = vc[:num_heads], vc[num_heads:]
+        
+    #     ku_cat, vu_cat = torch.cat([ku_o, *ku_r.chunk(B-1)], 1), torch.cat([vu_o, *vu_r.chunk(B-1)], 1)
+    #     kc_cat, vc_cat = torch.cat([kc_o, *kc_r.chunk(B-1)], 1), torch.cat([vc_o, *vc_r.chunk(B-1)], 1)
+
+    #     out_u_target = self.attn_batch(qu_o, ku_cat, vu_cat, None, None, is_cross, place_in_unet, num_heads, attn_batch_type='mrsa', **kwargs)
+    #     out_c_target = self.attn_batch(qc_o, kc_cat, vc_cat, None, None, is_cross, place_in_unet, num_heads, attn_batch_type='mrsa', **kwargs)
+        
+    #     # The larger the style_fidelity, the more like the reference concepts, range of values: [0,1]
+    #     if self.style_fidelity > 0:
+    #         out_u_target = (1 - self.style_fidelity) * out_u_target + self.style_fidelity * self.attn_batch(qu_o, ku_o, vu_o, None, None, is_cross, place_in_unet, num_heads, **kwargs)
+
+    #     out = self.sa_forward(q, k, v, sim, attn, is_cross, place_in_unet, num_heads, **kwargs)
+    #     out_u, out_c = out.chunk(2)
+    #     out_u_ref, out_c_ref = out_u[1:], out_c[1:]
+    #     out = torch.cat([out_u_target, out_u_ref, out_c_target, out_c_ref], dim=0)
+        
+    #     return out
+    def compute_gamma(self):
+        if self.cur_step < self.start_step:
+            return 0.0
+        elif self.cur_step >= self.end_step:
+            return 1.0
+        else:
+            return (self.cur_step - self.start_step) / (self.end_step - self.start_step)
+    
     def mrsa_forward(self, q, k, v, sim, attn, is_cross, place_in_unet, num_heads, **kwargs):
         """
-        Mutli-reference self-attention(MRSA) forward function
+        Multi-reference self-attention (MRSA) with soft gating
         """
         if is_cross or self.cur_step not in self.step_idx or self.cur_att_layer // 2 not in self.layer_idx:
             return self.sa_forward(q, k, v, sim, attn, is_cross, place_in_unet, num_heads, **kwargs)
-        
+
         B = q.shape[0] // num_heads // 2
-        
+
         qu, qc = q.chunk(2)
         ku, kc = k.chunk(2)
         vu, vc = v.chunk(2)
 
-        # The first batch is the q,k,v feature of $z_t$ (own feature), and the subsequent batches are the q,k,v features of $z_t^'$ (reference featrue)
-        qu_o, qu_r = qu[:num_heads], qu[num_heads:] 
+        qu_o, qu_r = qu[:num_heads], qu[num_heads:]
         qc_o, qc_r = qc[:num_heads], qc[num_heads:]
-        
+
         ku_o, ku_r = ku[:num_heads], ku[num_heads:]
         kc_o, kc_r = kc[:num_heads], kc[num_heads:]
-        
+
         vu_o, vu_r = vu[:num_heads], vu[num_heads:]
         vc_o, vc_r = vc[:num_heads], vc[num_heads:]
-        
-        ku_cat, vu_cat = torch.cat([ku_o, *ku_r.chunk(B-1)], 1), torch.cat([vu_o, *vu_r.chunk(B-1)], 1)
-        kc_cat, vc_cat = torch.cat([kc_o, *kc_r.chunk(B-1)], 1), torch.cat([vc_o, *vc_r.chunk(B-1)], 1)
+
+        ku_cat, vu_cat = torch.cat([ku_o, *ku_r.chunk(B - 1)], 1), torch.cat([vu_o, *vu_r.chunk(B - 1)], 1)
+        kc_cat, vc_cat = torch.cat([kc_o, *kc_r.chunk(B - 1)], 1), torch.cat([vc_o, *vc_r.chunk(B - 1)], 1)
 
         out_u_target = self.attn_batch(qu_o, ku_cat, vu_cat, None, None, is_cross, place_in_unet, num_heads, attn_batch_type='mrsa', **kwargs)
         out_c_target = self.attn_batch(qc_o, kc_cat, vc_cat, None, None, is_cross, place_in_unet, num_heads, attn_batch_type='mrsa', **kwargs)
-        
-        # The larger the style_fidelity, the more like the reference concepts, range of values: [0,1]
-        if self.style_fidelity > 0:
-            out_u_target = (1 - self.style_fidelity) * out_u_target + self.style_fidelity * self.attn_batch(qu_o, ku_o, vu_o, None, None, is_cross, place_in_unet, num_heads, **kwargs)
 
-        out = self.sa_forward(q, k, v, sim, attn, is_cross, place_in_unet, num_heads, **kwargs)
-        out_u, out_c = out.chunk(2)
-        out_u_ref, out_c_ref = out_u[1:], out_c[1:]
-        out = torch.cat([out_u_target, out_u_ref, out_c_target, out_c_ref], dim=0)
-        
+        # apply style fidelity
+        if self.style_fidelity > 0:
+            out_u_target = (1 - self.style_fidelity) * out_u_target + self.style_fidelity * self.attn_batch(
+                qu_o, ku_o, vu_o, None, None, is_cross, place_in_unet, num_heads, **kwargs)
+
+        # baseline output (vanilla SA)
+        msa_output = self.sa_forward(q, k, v, sim, attn, is_cross, place_in_unet, num_heads, **kwargs)
+        msa_u, msa_c = msa_output.chunk(2)
+        msa_u_ref, msa_c_ref = msa_u[1:], msa_c[1:]
+
+        # MRSA output
+        mrsa_output = torch.cat([out_u_target, msa_u_ref, out_c_target, msa_c_ref], dim=0)
+
+        # soft gate weight
+        gamma = self.compute_gamma()
+
+        out = (1 - gamma) * msa_output + gamma * mrsa_output
+
+        # optional debug
+        if self.cur_att_layer == 0 and self.cur_step % 50 == 0:
+            print(f"[MRSA SoftGate] step: {self.cur_step}, gamma: {gamma:.3f}")
+
         return out
+

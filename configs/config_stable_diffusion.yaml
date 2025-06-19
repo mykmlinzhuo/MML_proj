@@ -1,6 +1,7 @@
 mark: ""
 
-model_path: "runwayml/stable-diffusion-v1-5"
+model_path: "/cephfs/shared/linzhuo/multimodal/FreeCustom/sd_v1.5"
+lora_path:  /cephfs/shared/linzhuo/multimodal/stable-diffusion-v1.5-lora/output/mc  
 
 gpu: 0
 
@@ -10,7 +11,7 @@ end_step: 50
 layer_idx: [10,11,12,13,14,15]
 
 # set seeds
-seeds: [2]
+seeds: [42]
 
 # set reference image infos
 ref_image_infos: {
@@ -18,11 +19,11 @@ ref_image_infos: {
   dataset/freecustom/multi_concept/dog_hat_sunglasses_0/image/hat.jpg: a cat wearing a red and black hat,
   dataset/freecustom/multi_concept/dog_hat_sunglasses_0/image/sunglasses.jpg: a cat with sunglasses,
 }
-target_prompt: "a dog with sunglasses wearing a red and black hat"
+target_prompt: "a Minecraft dog with sunglasses wearing a red and black hat"
 
 # ref image setting
 use_null_ref_prompts: False     # Whether or not to use an empty prompt when denoising reference images.
-mask_weights: [3.0, 3.0, 3.0]   # The larger the mask_weight is, the higher attention is for the reference image.
+mask_weights: [1.0, 1.0, 1.0]   # The larger the mask_weight is, the higher attention is for the reference image.
 
 negative_prompt: "lowres, bad anatomy, text, error, cropped, worst quality, low quality, normal quality, jpeg artifacts, blurry"
-style_fidelity: 1 # The larger the style_fidelity, the more like the reference concepts, range of values: [0,1]
+style_fidelity: 0.5 # The larger the style_fidelity, the more like the reference concepts, range of values: [0,1]
