@@ -1,7 +1,7 @@
 mark: ""
 
-model_path: "/cephfs/shared/linzhuo/multimodal/FreeCustom/sd_v1.5"
-lora_path:  /cephfs/shared/linzhuo/multimodal/stable-diffusion-v1.5-lora/output/mc  
+model_path: "sd model path" 
+lora_path:  "lora .bin path after doing things in the lora branch"
 
 gpu: 0
 
@@ -15,11 +15,11 @@ seeds: [42]
 
 # set reference image infos
 ref_image_infos: {
-  dataset/freecustom/multi_concept/dog_hat_sunglasses_0/image/dog.jpg: a dog,
-  dataset/freecustom/multi_concept/dog_hat_sunglasses_0/image/hat.jpg: a cat wearing a red and black hat,
-  dataset/freecustom/multi_concept/dog_hat_sunglasses_0/image/sunglasses.jpg: a cat with sunglasses,
+  img1path : "image1 label",
+  img2path : "image2 label",
+  img3path : "image3 label"
 }
-target_prompt: "a Minecraft dog with sunglasses wearing a red and black hat"
+target_prompt: "target prompt that describes the combination of the reference images"
 
 # ref image setting
 use_null_ref_prompts: False     # Whether or not to use an empty prompt when denoising reference images.

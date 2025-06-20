@@ -17,7 +17,7 @@ if __name__ == "__main__":
     sys.path.append(os.getcwd())
 
     # load config
-    cfg = OmegaConf.load("configs/config_stable_diffusion.yaml")
+    cfg = OmegaConf.load("configs/try.yaml")
     print(f'config: {cfg}')
 
     # set results and log output root directory
