@@ -1,23 +1,24 @@
-# MML Project Initilization
+# 🎨 CLIP the Concept, Diffuse the Style
 
-## 2025.5.17
-After conducting a pilot study on flow-based model inpainting, flow-based model distillation and flow-based model acceleration, I personally find these three codebases which would be helpful for our research.
-- [Diffusion Based Model Inpainting](https://github.com/Sherrylone/PQDiff)
-- [Flow-Based Model for Image Generation](https://github.com/willisma/SiT)
-- [Flow-Based Model Distillation](https://github.com/willisma/SiT)
+**Official implementation of our MML Project**:  
 
-Maybe we could simply do A+B+C, haha.
+> *CLIP the Concept, Diffuse the Style: Towards Style-Consistent and Concept-Aware Diffusion Generation*  
 
-### Environment
+---
 
-Refer to README_old.md for the environment setup.
+This repository presents a **lightweight tuning framework** for generating visually coherent images under hybrid visual guidance—including both high-level semantic concepts and low-level artistic styles. Our method extends the FreeCustom baseline by introducing:
 
-### Setup
+- 🧠 **LoRA-based style modulation**  
+- 🔍 **Multi-Reference Self-Attention (MRSA)** for concept fusion  
+- 🎯 **CLIP-Guided Adaptive Masking (CGAM)** for dynamic reference weighting  
+- 🔄 **Soft Gated Attention** for smooth feature integration
 
-Download SiT-XL-2-256.pt and reach out to lz for the dataset.
+---
 
-### Tuning
+## 🌿 Repository Structure
 
-```bash
-torchrun --nproc_per_node=1 train_outpaint.py   --data-path ./small_dataset   --pretrained-ckpt ./pretrained_models/SiT-XL-2-256.pt --wandb 
-```
+- **`master` branch**  
+  Contains our **main pipeline** for multi-concept + style-controlled image generation. You can directly run inference and reproduce the results in the paper.
+- **`lora` branch**  
+  Provides **training scripts for LoRA-style modules**, used to model specific target styles (e.g., Minecraft pixel art, Monet impressionism) using 20-shot reference images per style.
+
